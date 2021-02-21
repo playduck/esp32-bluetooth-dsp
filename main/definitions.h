@@ -21,6 +21,7 @@
 #include "esp_bt.h"
 
 #include "driver/i2s.h"
+#include "driver/gpio.h"
 #include "esp_a2dp_api.h"
 #include "esp_avrc_api.h"
 #include "esp_bt_device.h"
