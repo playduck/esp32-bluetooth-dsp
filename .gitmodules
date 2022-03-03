@@ -1,0 +1,3 @@
+[submodule "components/dsp-playground"]
+	path = components/dsp-playground
+	url = https://github.com/playduck/dsp-playground.git
