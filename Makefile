@@ -4,5 +4,7 @@
 #
 
 PROJECT_NAME := dsp
+EXTRA_COMPONENT_DIRS += \
+  $(abspath ./components/dsp-playground/)
 
 include $(IDF_PATH)/make/project.mk
