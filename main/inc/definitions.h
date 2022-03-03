@@ -30,4 +30,5 @@
 
 #include "bt_app_av.h"
 #include "bt_app_core.h"
-#include "dsp.h"
+
+#include "pipeline.h"

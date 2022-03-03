@@ -31,8 +31,7 @@ static esp_avrc_rn_evt_cap_mask_t s_avrc_peer_rn_cap;
 static _lock_t s_volume_lock;
 static xTaskHandle s_vcs_task_hdl = NULL;
 uint8_t s_volume = 0;
-// float log_volume = 0;
-//static uint8_t s_volume = 0;
+extern gain_t vol[2];
 static bool s_volume_notify;
 
 /* callback for A2DP sink */
@@ -175,7 +174,7 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
                      a2d->audio_cfg.mcc.cie.sbc[3]);
             ESP_LOGI(BT_AV_TAG, "Audio player configured, sample rate=%d", sample_rate);
 
-            set_sample_rate(sample_rate);
+            //set_sample_rate(sample_rate); // TODO
         }
         break;
     }
@@ -297,14 +296,21 @@ static void bt_av_hdl_avrc_ct_evt(uint16_t event, void *p_param)
     }
 }
 
+static void set_volume()  {
+    // normalize vol range between 0dBFS and - min_db dvFS
+    const static float min_db = 64.0f;
+    float vol_normal = min_db * (s_volume + 1.0f) / 128.0f - min_db;
+
+    set_target_range(vol_normal, vol + 0);
+    set_target_range(vol_normal, vol + 1);
+}
+
 static void volume_set_by_controller(uint8_t volume)
 {
-    ESP_LOGI(BT_RC_TG_TAG, "Volume is set by remote controller %d%% (%d)\n", (uint32_t)volume * 100 / 0x7f, volume);
+    ESP_LOGI(BT_RC_TG_TAG, "Volume is set by remote controller %d\n", volume);
     _lock_acquire(&s_volume_lock);
     s_volume = volume;
-    // log_volume = powf(volume / 250.0F, 2.0F );
-    // log_volume = (float)(volume * volume) / 62500.0;
-    // ESP_LOGI(BT_RC_TG_TAG, "Log Volume %f\n", log_volume);
+    set_volume();
     _lock_release(&s_volume_lock);
 }
 
@@ -314,7 +320,7 @@ static void volume_set_by_local_host(uint8_t volume)
     ESP_LOGI(BT_RC_TG_TAG, "Volume is set locally to: %d%%", (uint32_t)volume * 100 / 0x7f);
     _lock_acquire(&s_volume_lock);
     s_volume = volume;
-    // log_volume = (float)(volume * volume) / 62500.0;
+    set_volume();
     _lock_release(&s_volume_lock);
 
     if (s_volume_notify)

@@ -22,24 +22,35 @@ enum
 
 /* handler for bluetooth stack enabled events */
 static void bt_av_hdl_stack_evt(uint16_t event, void *p_param);
-
 static xQueueHandle gpio_evt_queue = NULL;
 
-static void IRAM_ATTR gpio_isr_handler(void* arg)
+extern gain_t vol[2];
+
+static void IRAM_ATTR gpio_isr_handler(void *arg)
 {
-    uint32_t gpio_num = (uint32_t) arg;
+    uint32_t gpio_num = (uint32_t)arg;
     xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
 }
 
-static void gpio_task_example(void* arg)
+static void gpio_task_example(void *arg)
 {
     uint32_t io_num;
-    for(;;) {
-        if(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
+    ESP_LOGI("GPIO", "Starting GPIO ISR");
+
+    for (;;)
+    {
+        if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY))
+        {
             printf("GPIO[%d] intr, val: %d\n", io_num, gpio_get_level(io_num));
-            if(io_num == 33 && gpio_get_level(io_num) == 0) {
-                use_bass_enhancement = !use_bass_enhancement;
-                ESP_LOGI("BASS", "Enhancement %s", use_bass_enhancement ? "On" : "Off");
+            if (io_num == 33 && gpio_get_level(io_num) == 0)
+            {
+                // use_bass_enhancement = !use_bass_enhancement;
+                // ESP_LOGI("BASS", "Enhancement %s", use_bass_enhancement ? "On" : "Off");
+                //  TODO
+
+                char* pcL = malloc(512);
+                vTaskList(pcL);
+                printf("%s", pcL);
             }
         }
     }
@@ -66,44 +77,48 @@ void app_main()
     gpio_config(&io_conf);
 
     gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
-    xTaskCreate(gpio_task_example, "gpio_task_example", 2048, NULL, 10, NULL);
+    xTaskCreate(gpio_task_example, "GPIO_HANDLER", 2048, NULL, 10, NULL);
 
     gpio_install_isr_service(0);
-    gpio_isr_handler_add(GPIO_NUM_33, gpio_isr_handler, (void*) GPIO_NUM_33);
+    gpio_isr_handler_add(GPIO_NUM_33, gpio_isr_handler, (void *)GPIO_NUM_33);
+
 
     /* I2S */
     i2s_config_t i2s_config = {
-    #ifdef CONFIG_EXAMPLE_A2DP_SINK_OUTPUT_INTERNAL_DAC
-            .mode = I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_DAC_BUILT_IN,
-    #else
-            .mode = I2S_MODE_MASTER | I2S_MODE_TX, // Only TX
-    #endif
-            .sample_rate = 44100,
-            .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
-            .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT, //2-channels
-            .communication_format = I2S_COMM_FORMAT_STAND_MSB,
-            // .communication_format = I2S_COMM_FORMAT_I2S_MSB,
-            .dma_buf_count = 6,
-            .dma_buf_len = 60,
-            .intr_alloc_flags = 0,     //Default interrupt priority
-            .use_apll = true,
-            .tx_desc_auto_clear = true //Auto clear tx descriptor on underflow
-        };
+#ifdef CONFIG_EXAMPLE_A2DP_SINK_OUTPUT_INTERNAL_DAC
+        .mode = I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_DAC_BUILT_IN,
+#else
+        .mode = I2S_MODE_MASTER | I2S_MODE_TX, // Only TX
+#endif
+        .sample_rate = 44100,
+        .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
+        .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT, // 2-channels
+        .communication_format = I2S_COMM_FORMAT_STAND_MSB,
+        // .communication_format = I2S_COMM_FORMAT_I2S_MSB,
+        .dma_buf_count = 6,
+        .dma_buf_len = 60,
+        .intr_alloc_flags = 0, // Default interrupt priority
+        .use_apll = true,
+        .tx_desc_auto_clear = true // Auto clear tx descriptor on underflow
+    };
 
-        i2s_driver_install(0, &i2s_config, 0, NULL);
-    #ifdef CONFIG_EXAMPLE_A2DP_SINK_OUTPUT_INTERNAL_DAC
-        i2s_set_dac_mode(I2S_DAC_CHANNEL_BOTH_EN);
-        i2s_set_pin(0, NULL);
-    #else
-        i2s_pin_config_t pin_config = {
-            .bck_io_num = CONFIG_EXAMPLE_I2S_BCK_PIN,
-            .ws_io_num = CONFIG_EXAMPLE_I2S_LRCK_PIN,
-            .data_out_num = CONFIG_EXAMPLE_I2S_DATA_PIN,
-            .data_in_num = -1 //Not used
-        };
+    i2s_driver_install(0, &i2s_config, 0, NULL);
+#ifdef CONFIG_EXAMPLE_A2DP_SINK_OUTPUT_INTERNAL_DAC
+    i2s_set_dac_mode(I2S_DAC_CHANNEL_BOTH_EN);
+    i2s_set_pin(0, NULL);
+#else
+    i2s_pin_config_t pin_config = {
+        .mck_io_num = GPIO_NUM_0,
+        .bck_io_num = CONFIG_EXAMPLE_I2S_BCK_PIN,
+        .ws_io_num = CONFIG_EXAMPLE_I2S_LRCK_PIN,
+        .data_out_num = CONFIG_EXAMPLE_I2S_DATA_PIN,
+        .data_in_num = -1 // Not used
+    };
 
-        i2s_set_pin(0, &pin_config);
-    #endif
+    i2s_set_pin(0, &pin_config);
+#endif
+
+    initilize(44100);
 
     /* Bluetooth */
     ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_BLE));
@@ -133,18 +148,18 @@ void app_main()
         return;
     }
 
-        /* create application task */
-        bt_app_task_start_up();
+    /* create application task */
+    bt_app_task_start_up();
 
-        /* Bluetooth device name, connection mode and profile set up */
-        bt_app_work_dispatch(bt_av_hdl_stack_evt, BT_APP_EVT_STACK_UP, NULL, 0, NULL);
+    /* Bluetooth device name, connection mode and profile set up */
+    bt_app_work_dispatch(bt_av_hdl_stack_evt, BT_APP_EVT_STACK_UP, NULL, 0, NULL);
 
-    #if (CONFIG_BT_SSP_ENABLED == true)
-        /* Set default parameters for Secure Simple Pairing */
-        esp_bt_sp_param_t param_type = ESP_BT_SP_IOCAP_MODE;
-        esp_bt_io_cap_t iocap = ESP_BT_IO_CAP_IO;
-        esp_bt_gap_set_security_param(param_type, &iocap, sizeof(uint8_t));
-    #endif
+#if (CONFIG_BT_SSP_ENABLED == true)
+    /* Set default parameters for Secure Simple Pairing */
+    esp_bt_sp_param_t param_type = ESP_BT_SP_IOCAP_MODE;
+    esp_bt_io_cap_t iocap = ESP_BT_IO_CAP_IO;
+    esp_bt_gap_set_security_param(param_type, &iocap, sizeof(uint8_t));
+#endif
 
     /*
      * Set default parameters for Legacy Pairing
@@ -157,11 +172,6 @@ void app_main()
     pin_code[2] = '3';
     pin_code[3] = '4';
     esp_bt_gap_set_pin(pin_type, 4, pin_code);
-
-    /* Filters */
-    flush();
-    set_sample_rate(44100);
-    set_delay_ms(20);
 }
 
 void bt_app_gap_cb(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *param)

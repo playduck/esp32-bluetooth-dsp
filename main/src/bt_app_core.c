@@ -101,7 +101,7 @@ static void bt_app_task_handler(void *arg)
 void bt_app_task_start_up(void)
 {
     s_bt_app_task_queue = xQueueCreate(10, sizeof(bt_app_msg_t));
-    xTaskCreate(bt_app_task_handler, "BtAppT", 3072, NULL, configMAX_PRIORITIES - 3, &s_bt_app_task_handle);
+    xTaskCreate(bt_app_task_handler, "BtAppT", 3 * 1024, NULL, configMAX_PRIORITIES - 1, &s_bt_app_task_handle);
     return;
 }
 
@@ -119,6 +119,19 @@ void bt_app_task_shut_down(void)
     }
 }
 
+static inline void process(uint8_t* data, size_t* item_size) {
+    int16_t* data_mut = (int16_t*) data;
+
+    for(uint16_t iterator = 0; iterator < *item_size; iterator += 4)  {
+        int16_t* s1 = (int16_t*)data_mut;
+        data_mut++;
+        int16_t* s2 = (int16_t*)data_mut;
+        data_mut++;
+
+        process_sample(s1, s2);
+    }
+}
+
 static void bt_i2s_task_handler(void *arg)
 {
     uint8_t *data = NULL;
@@ -130,8 +143,8 @@ static void bt_i2s_task_handler(void *arg)
         data = (uint8_t *)xRingbufferReceive(s_ringbuf_i2s, &item_size, (portTickType)portMAX_DELAY);
         if (item_size != 0)
         {
-            //printf("size: %u, data: %i\n", item_size, (int32_t)*data);
-            process_data(data, item_size);
+            process(data, &item_size);
+
             i2s_write(0, data, item_size, &bytes_written, portMAX_DELAY);
             vRingbufferReturnItem(s_ringbuf_i2s, (void *)data);
         }
@@ -146,7 +159,7 @@ void bt_i2s_task_start_up(void)
         return;
     }
 
-    xTaskCreate(bt_i2s_task_handler, "BtI2ST", 4 * 1024, NULL, configMAX_PRIORITIES - 3, &s_bt_i2s_task_handle);
+    xTaskCreatePinnedToCore(bt_i2s_task_handler, "BtI2ST", (4 * 1024), NULL, configMAX_PRIORITIES - 1, &s_bt_i2s_task_handle, 1);
     return;
 }
 
