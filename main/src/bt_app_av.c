@@ -298,11 +298,15 @@ static void bt_av_hdl_avrc_ct_evt(uint16_t event, void *p_param)
 
 static void set_volume()  {
     // normalize vol range between 0dBFS and - min_db dvFS
-    const static float min_db = 64.0f;
-    float vol_normal = min_db * (s_volume + 1.0f) / 128.0f - min_db;
+    const static float min_db = 32.0f;
+    float vol_normal = min_db * s_volume / 127.0f - min_db;
 
-    set_target_range(vol_normal, vol + 0);
-    set_target_range(vol_normal, vol + 1);
+    // fade to -inf decibel at 0 vol
+    float window = 1.0f/(tanhf(0.2f * s_volume - 0.5f) / 2.0f  + 0.5f);
+    float vol_falloff = window * vol_normal;
+
+    set_target_range(vol_falloff, vol + 0);
+    set_target_range(vol_falloff, vol + 1);
 }
 
 static void volume_set_by_controller(uint8_t volume)
