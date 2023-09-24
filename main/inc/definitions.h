@@ -1,3 +1,6 @@
+#ifndef __DEF_H__
+#define __DEF_H__
+
 #pragma once
 
 #include "freertos/FreeRTOS.h"
@@ -12,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include "esp_log.h"
 #include "esp_system.h"
@@ -32,3 +36,4 @@
 #include "bt_app_core.h"
 
 #include "pipeline.h"
+#endif
